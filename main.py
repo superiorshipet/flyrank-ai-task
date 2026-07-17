@@ -1,15 +1,11 @@
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Response, status
+from fastapi import FastAPI, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
-app = FastAPI(
-    title="Task Management API")
+app = FastAPI(title="Task Management API")
 
-# -----------------------------
-# In-memory database
-# -----------------------------
-tasks = [
+DEFAULT_TASKS = [
     {
         "id": 1,
         "title": "Learn FastAPI",
@@ -27,12 +23,9 @@ tasks = [
     }
 ]
 
-
-# -----------------------------
-# Request Models
-# -----------------------------
+tasks = [task.copy() for task in DEFAULT_TASKS]
 class TaskCreate(BaseModel):
-    title: str = Field(..., min_length=1, examples=["Buy milk"])
+    title: str = Field(..., min_length=1, examples=["Buy Milk"])
 
 
 class TaskUpdate(BaseModel):
@@ -40,9 +33,6 @@ class TaskUpdate(BaseModel):
     done: Optional[bool] = None
 
 
-# -----------------------------
-# Helper Function
-# -----------------------------
 def find_task(task_id: int):
     for task in tasks:
         if task["id"] == task_id:
@@ -50,9 +40,8 @@ def find_task(task_id: int):
     return None
 
 
-# -----------------------------
-# Root Endpoint
-# -----------------------------
+def get_next_id():
+    return max((task["id"] for task in tasks), default=0) + 1
 @app.get(
     "/",
     summary="API Information",
@@ -61,17 +50,14 @@ def find_task(task_id: int):
 def root():
     return {
         "name": "Task API",
-        "version": "1.0",
+        "version": "1.0.0",
         "endpoints": [
+            "/health",
             "/tasks",
-            "/health"
+            "/stats",
+            "/reset"
         ]
     }
-
-
-# -----------------------------
-# Health Check
-# -----------------------------
 @app.get(
     "/health",
     summary="Health Check",
@@ -81,26 +67,39 @@ def health():
     return {
         "status": "ok"
     }
-
-
-# -----------------------------
-# Get All Tasks
-# -----------------------------
 @app.get(
     "/tasks",
     summary="Get All Tasks",
-    description="Returns all tasks."
+    description="Returns all tasks with optional filtering and searching."
 )
-def get_tasks():
-    return tasks
+def get_tasks(
+    done: Optional[bool] = Query(
+        default=None,
+        description="Filter by completed status"
+    ),
+    search: Optional[str] = Query(
+        default=None,
+        description="Search by title"
+    )
+):
+    result = tasks
+
+    if done is not None:
+        result = [task for task in result if task["done"] == done]
+
+    if search:
+        result = [
+            task
+            for task in result
+            if search.lower() in task["title"].lower()
+        ]
+
+    return result
 
 
-# -----------------------------
-# Get Single Task
-# -----------------------------
 @app.get(
     "/tasks/{task_id}",
-    summary="Get Task by ID",
+    summary="Get Task",
     description="Returns a task using its ID."
 )
 def get_task(task_id: int):
@@ -113,11 +112,6 @@ def get_task(task_id: int):
         )
 
     return task
-
-
-# -----------------------------
-# Create Task
-# -----------------------------
 @app.post(
     "/tasks",
     status_code=status.HTTP_201_CREATED,
@@ -134,10 +128,8 @@ def create_task(task: TaskCreate):
             detail="Title cannot be empty"
         )
 
-    next_id = max([t["id"] for t in tasks], default=0) + 1
-
     new_task = {
-        "id": next_id,
+        "id": get_next_id(),
         "title": title,
         "done": False
     }
@@ -146,14 +138,10 @@ def create_task(task: TaskCreate):
 
     return new_task
 
-
-# -----------------------------
-# Update Task
-# -----------------------------
 @app.put(
     "/tasks/{task_id}",
     summary="Update Task",
-    description="Updates an existing task."
+    description="Updates the title and/or completion status of a task."
 )
 def update_task(task_id: int, updated_task: TaskUpdate):
 
@@ -172,6 +160,7 @@ def update_task(task_id: int, updated_task: TaskUpdate):
         )
 
     if updated_task.title is not None:
+
         title = updated_task.title.strip()
 
         if not title:
@@ -186,16 +175,11 @@ def update_task(task_id: int, updated_task: TaskUpdate):
         task["done"] = updated_task.done
 
     return task
-
-
-# -----------------------------
-# Delete Task
-# -----------------------------
 @app.delete(
     "/tasks/{task_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Task",
-    description="Deletes a task by its ID."
+    description="Deletes a task."
 )
 def delete_task(task_id: int):
 
@@ -210,3 +194,46 @@ def delete_task(task_id: int):
     tasks.remove(task)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ------------------------------------------------------------------
+# Statistics
+# ------------------------------------------------------------------
+
+@app.get(
+    "/stats",
+    summary="Task Statistics",
+    description="Returns statistics about the current tasks."
+)
+def get_stats():
+
+    total = len(tasks)
+    completed = sum(task["done"] for task in tasks)
+
+    return {
+        "total": total,
+        "done": completed,
+        "open": total - completed
+    }
+
+
+# ------------------------------------------------------------------
+# Reset Tasks
+# ------------------------------------------------------------------
+
+@app.post(
+    "/reset",
+    summary="Reset Tasks",
+    description="Restores the original sample tasks."
+)
+def reset_tasks():
+
+    tasks.clear()
+
+    for task in DEFAULT_TASKS:
+        tasks.append(task.copy())
+
+    return {
+        "message": "Tasks reset successfully.",
+        "tasks": tasks
+    }
