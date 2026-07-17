@@ -1,0 +1,135 @@
+# Task Management API
+
+A simple RESTful CRUD API built with FastAPI for the FlyRank Backend Internship Assignment.
+
+## Features
+
+- Create tasks
+- Read all tasks
+- Read a single task
+- Update existing tasks
+- Delete tasks
+- Interactive Swagger documentation
+- Input validation
+- Proper HTTP status codes
+
+---
+
+## Technologies Used
+
+- Python 3
+- FastAPI
+- Uvicorn
+- Pydantic
+
+---
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/task-api.git
+cd task-api
+```
+
+Create a virtual environment:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Run the application:
+
+```bash
+uvicorn main:app --reload
+```
+
+---
+
+## API Documentation
+
+Swagger UI
+
+```
+http://127.0.0.1:8000/docs
+```
+
+ReDoc
+
+```
+http://127.0.0.1:8000/redoc
+```
+
+---
+
+## Endpoints
+
+| Method | Endpoint | Description |
+|---------|----------|-------------|
+| GET | `/` | API Information |
+| GET | `/health` | Health Check |
+| GET | `/tasks` | Get all tasks |
+| GET | `/tasks/{id}` | Get task by ID |
+| POST | `/tasks` | Create task |
+| PUT | `/tasks/{id}` | Update task |
+| DELETE | `/tasks/{id}` | Delete task |
+
+---
+
+## Example Request
+
+Create a task
+
+```bash
+curl -X POST http://127.0.0.1:8000/tasks \
+-H "Content-Type: application/json" \
+-d '{"title":"Buy Milk"}'
+```
+
+Response
+
+```json
+{
+    "id": 4,
+    "title": "Buy Milk",
+    "done": false
+}
+```
+
+---
+
+## Status Codes
+
+- 200 OK
+- 201 Created
+- 204 No Content
+- 400 Bad Request
+- 404 Not Found
+
+---
+
+## Project Structure
+
+```
+task-api/
+│
+├── main.py
+├── requirements.txt
+├── README.md
+├── .gitignore
+└── venv/
+```
+
+---
+
+## Author
+
+Mohamed Shipet
