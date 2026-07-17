@@ -1,5 +1,4 @@
-from fastapi import FastAPI
-
+from fastapi import FastAPI, HTTPException
 app = FastAPI(
     title="Task API",
     description="Simple CRUD API for managing tasks",
@@ -21,3 +20,24 @@ def health():
     return {
         "status": "ok"
     }
+@app.get("/tasks", summary="Get all tasks")
+def get_tasks():
+    return tasks
+
+tasks = [
+    {
+        "id": 1,
+        "title": "Learn FastAPI",
+        "done": False
+    },
+    {
+        "id": 2,
+        "title": "Build CRUD API",
+        "done": False
+    },
+    {
+        "id": 3,
+        "title": "Submit Assignment",
+        "done": True
+    }
+]
