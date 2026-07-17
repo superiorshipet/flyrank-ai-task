@@ -1,13 +1,14 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from typing import Optional
+
+from fastapi import FastAPI, HTTPException, Response, status
+from pydantic import BaseModel, Field
 
 app = FastAPI(
-    title="Task API",
-    description="Simple CRUD API for managing tasks",
-    version="1.0"
-)
+    title="Task Management API")
 
+# -----------------------------
 # In-memory database
+# -----------------------------
 tasks = [
     {
         "id": 1,
@@ -27,63 +28,185 @@ tasks = [
 ]
 
 
-# Request model
+# -----------------------------
+# Request Models
+# -----------------------------
 class TaskCreate(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, examples=["Buy milk"])
 
 
-@app.get("/", summary="API Information")
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    done: Optional[bool] = None
+
+
+# -----------------------------
+# Helper Function
+# -----------------------------
+def find_task(task_id: int):
+    for task in tasks:
+        if task["id"] == task_id:
+            return task
+    return None
+
+
+# -----------------------------
+# Root Endpoint
+# -----------------------------
+@app.get(
+    "/",
+    summary="API Information",
+    description="Returns general information about the API."
+)
 def root():
     return {
         "name": "Task API",
         "version": "1.0",
-        "endpoints": ["/tasks"]
+        "endpoints": [
+            "/tasks",
+            "/health"
+        ]
     }
 
 
-@app.get("/health", summary="Health Check")
+# -----------------------------
+# Health Check
+# -----------------------------
+@app.get(
+    "/health",
+    summary="Health Check",
+    description="Checks whether the API is running."
+)
 def health():
     return {
         "status": "ok"
     }
 
 
-@app.get("/tasks", summary="Get all tasks")
+# -----------------------------
+# Get All Tasks
+# -----------------------------
+@app.get(
+    "/tasks",
+    summary="Get All Tasks",
+    description="Returns all tasks."
+)
 def get_tasks():
     return tasks
 
 
-@app.get("/tasks/{task_id}", summary="Get task by ID")
+# -----------------------------
+# Get Single Task
+# -----------------------------
+@app.get(
+    "/tasks/{task_id}",
+    summary="Get Task by ID",
+    description="Returns a task using its ID."
+)
 def get_task(task_id: int):
-    for task in tasks:
-        if task["id"] == task_id:
-            return task
+    task = find_task(task_id)
 
-    raise HTTPException(
-        status_code=404,
-        detail=f"Task {task_id} not found"
-    )
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task {task_id} not found"
+        )
+
+    return task
 
 
-@app.post("/tasks", status_code=201, summary="Create a new task")
+# -----------------------------
+# Create Task
+# -----------------------------
+@app.post(
+    "/tasks",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Task",
+    description="Creates a new task."
+)
 def create_task(task: TaskCreate):
 
-    # Validate title
-    if not task.title.strip():
+    title = task.title.strip()
+
+    if not title:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Title cannot be empty"
         )
 
-    # Generate unique ID
-    next_id = max(task["id"] for task in tasks) + 1 if tasks else 1
+    next_id = max([t["id"] for t in tasks], default=0) + 1
 
     new_task = {
         "id": next_id,
-        "title": task.title,
+        "title": title,
         "done": False
     }
 
     tasks.append(new_task)
 
     return new_task
+
+
+# -----------------------------
+# Update Task
+# -----------------------------
+@app.put(
+    "/tasks/{task_id}",
+    summary="Update Task",
+    description="Updates an existing task."
+)
+def update_task(task_id: int, updated_task: TaskUpdate):
+
+    task = find_task(task_id)
+
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task {task_id} not found"
+        )
+
+    if updated_task.title is None and updated_task.done is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nothing to update"
+        )
+
+    if updated_task.title is not None:
+        title = updated_task.title.strip()
+
+        if not title:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Title cannot be empty"
+            )
+
+        task["title"] = title
+
+    if updated_task.done is not None:
+        task["done"] = updated_task.done
+
+    return task
+
+
+# -----------------------------
+# Delete Task
+# -----------------------------
+@app.delete(
+    "/tasks/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete Task",
+    description="Deletes a task by its ID."
+)
+def delete_task(task_id: int):
+
+    task = find_task(task_id)
+
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task {task_id} not found"
+        )
+
+    tasks.remove(task)
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
